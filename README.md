@@ -89,7 +89,7 @@
 
 # 成長階段（判斷參考，不是進度表）
 🥚 概念（三層架構、引擎、模型結構與量化、三條路）→ 🐣 本機驗證（M1 上 Ollama / MLX + Open WebUI、驗證選型與術語表）→ 🦀 階段一上線（Linux + NVIDIA、compose、多人聊天）→ 🦞 RAG（embedding、向量庫、測試題集、pipeline）→ 🐊 fine-tune（QLoRA、訓練工具、DSL 配對資料、評測防退步）
-我目前：🥚 概念，整份路線圖已走過一遍（見 notes/01），尚未動手部署。不確定我程度時問 1–2 個問題，不要假設。
+我目前：🥚 概念 → 🐣 本機驗證的邊界，路線圖走過一遍（見 notes/01）、M1 啟動前的 SLM / MoE / Docker Desktop 網路層已整理（見 notes/02），尚未實際啟動 Ollama。不確定我程度時問 1–2 個問題，不要假設。
 
 # Code Review 模式（/review）
 對象是 compose 設定、引擎啟動參數、呼叫 API 的程式、RAG pipeline、訓練設定檔。依序檢查：會不會起不來或 OOM → 參數有沒有算對（VRAM、context、併發）→ 安全與資料外流風險（權限、區網、備份）→ 可觀測性（metrics、log）→ 可讀性。用 🔴 必改 / 🟡 建議 / 🟢 做得好 標示並說明理由。好的地方也要講。
@@ -127,6 +127,7 @@
 | 編號 | 主題 | 日期 |
 |---|---|---|
 | [01](notes/01-local-llm-deploy-rag-finetune.md) | 三層架構、部署路線圖、Ollama vs vLLM、token 生成流程、量化與模型格式、純推理 / RAG / fine-tune、LoRA 與 QLoRA、黑話與 DSL 策略、Claude 整合 | 2026-10-15 |
+| [02](notes/02-m1-ollama-and-docker-desktop-networking.md) | SLM 的定義與尺寸區間、dense vs MoE 與 FFN、M1 unified memory 估算、Ollama 啟動方式與模型 tag、`host.docker.internal` 在 Mac / Linux 的差異、Docker Desktop 的 VM + userspace proxy 網路層 | 2026-10-16 |
 
 ## 階段路線圖
 
@@ -138,7 +139,7 @@
 | 🦞 階段二 RAG | embedding model、向量庫、測試題集、Open WebUI 內建 RAG 到自寫 pipeline |
 | 🐊 階段三 fine-tune | dense 14B + QLoRA、LLaMA-Factory / Unsloth、DSL 配對資料、評測防退步 |
 
-目前位置：🥚 概念（整份路線圖已走過一遍，尚未動手部署）。
+目前位置：🥚 概念 → 🐣 本機驗證的邊界（路線圖走過一遍，M1 啟動前的知識點已整理，尚未實際啟動 Ollama）。
 
 ## 慣例
 
