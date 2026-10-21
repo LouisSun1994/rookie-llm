@@ -1,0 +1,8 @@
+# Python venv for mlx-lm (recreate: python3 -m venv ft && ft/bin/pip install mlx-lm)
+ft/
+
+# LoRA adapter weights (~21 MB each, float32); adapter_config.json stays in git
+ft-poc/adapters*/*.safetensors
+
+__pycache__/
+.DS_Store

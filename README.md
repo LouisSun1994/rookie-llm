@@ -121,6 +121,8 @@
 | 路徑 | 內容 |
 |---|---|
 | `notes/` | 學習筆記，依序編號 `NN-主題.md` |
+| `ft-poc/` | 第一次 LoRA POC：資料產生器、評測腳本、before / after 輸出、adapter 設定與失敗分析（見 [ft-poc/README.md](ft-poc/README.md)） |
+| `ft/` | mlx-lm 的 Python venv，不進 git |
 
 ### 筆記索引
 
@@ -130,6 +132,7 @@
 | [02](notes/02-m1-ollama-and-docker-desktop-networking.md) | SLM 的定義與尺寸區間、dense vs MoE 與 FFN、M1 unified memory 估算、Ollama 啟動方式與模型 tag、`host.docker.internal` 在 Mac / Linux 的差異、Docker Desktop 的 VM + userspace proxy 網路層 | 2026-10-16 |
 | [03](notes/03-model-families-engines-orchestration.md) | 模型 vs 引擎（權重沒有說明書、引擎的四塊）、模型種類 = 輸入→輸出 × 生成方式、自回歸 vs diffusion、CNN / UNet vs Transformer / DiT、latent / embedding / hidden state、VLM、Ollama / ComfyUI / 自帶 pipeline 對照、應用層 tool call 編排、TRELLIS.2 事實表、產圖地端部署 | 2026-10-16 |
 | [04](notes/04-finetune-distill-lora-rank.md) | fine-tune 的定義與術語階梯、黑箱 / 白箱蒸餾、三條獨立軸、改 context vs 改 W、Modelfile、矩陣的秩、LoRA 是約束不是優越、merge 與推論成本、QLoRA 訓練 VRAM 估算、safetensors vs GGUF、格式 × 引擎 × 環境 | 2026-10-16 |
+| [05](notes/05-harness-and-first-lora-poc.md) | harness / 引擎 / 模型的職責邊界、資料來源只有權重與 prompt、agent loop 與 RAG 時間軸、改認知的三條路（prompt / 權重 / logit_bias）、SFT 與 LoRA 產物、訓練機制與過擬合、第一次 LoRA POC 的資料集與評測設計、災難性遺忘 | 2026-10-20 ～ 2026-10-21 |
 
 ## 階段路線圖
 
@@ -141,7 +144,7 @@
 | 🦞 階段二 RAG | embedding model、向量庫、測試題集、Open WebUI 內建 RAG 到自寫 pipeline |
 | 🐊 階段三 fine-tune | dense 14B + QLoRA、LLaMA-Factory / Unsloth、DSL 配對資料、評測防退步 |
 
-目前位置：🥚 概念 → 🐣 本機驗證的邊界（路線圖走過一遍，M1 啟動前的知識點已整理，尚未實際啟動 Ollama）。
+目前位置：🥚 概念已走完 → 🐣 本機驗證（M1 上 Ollama + Open WebUI 已跑起）→ 🐊 fine-tune 第一次動手（LoRA POC 流程跑通，但對照題全部退化，正在修資料集與訓練參數，見 [ft-poc/README.md](ft-poc/README.md)）。
 
 ## 慣例
 
