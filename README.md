@@ -144,7 +144,7 @@
 | 🦞 階段二 RAG | embedding model、向量庫、測試題集、Open WebUI 內建 RAG 到自寫 pipeline |
 | 🐊 階段三 fine-tune | dense 14B + QLoRA、LLaMA-Factory / Unsloth、DSL 配對資料、評測防退步 |
 
-目前位置：🥚 概念已走完 → 🐣 本機驗證（M1 上 Ollama + Open WebUI 已跑起）→ 🐊 fine-tune 第一次動手（LoRA POC 流程跑通，但對照題全部退化，正在修資料集與訓練參數，見 [ft-poc/README.md](ft-poc/README.md)）。
+目前位置：🥚 概念已走完 → 🐣 本機驗證（M1 上 Ollama + Open WebUI 已跑起）→ 🐊 fine-tune 第一次動手（LoRA POC v2 對照題全崩，v3 收掉步長後 8 題全對，但還沒做 held-out 評測與歸因，見 [ft-poc/README.md](ft-poc/README.md)）。
 
 ## 慣例
 

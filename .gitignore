@@ -3,6 +3,8 @@ ft/
 
 # LoRA adapter weights (~21 MB each, float32); adapter_config.json stays in git
 ft-poc/adapters*/*.safetensors
+# sweep_ckpt.sh temp dirs (symlinks to checkpoints); the ckpt-*.md results stay
+ft-poc/sweep/.ck-*/
 
 __pycache__/
 .DS_Store

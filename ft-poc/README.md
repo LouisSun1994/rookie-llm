@@ -2,8 +2,9 @@
 
 - 日期：2026-10-20 ～ 2026-10-21
 - 對應筆記：[notes/05](../notes/05-harness-and-first-lora-poc.md)（概念與機制在那邊；這份只記實作細節、結果與失敗分析）
-- 狀態（2026-10-21）：**流程跑通，結果失敗**。目標題 3/4、拒答題 0/1、對照題 0/3。掛上 adapter 後，模型在中性 prompt 下的輸出整個崩掉。
-- 一句話：資料集 v2 的修正（加反例、加通用題當錨）**沒有擋住災難性遺忘**。主要嫌疑依序是：learning rate 是 mlx_lm 預設的 10 倍、loss 預設把 prompt token 也算進去、通用題太少太短、valid 裡 0 筆通用題所以 val loss 看不到退步。
+- 狀態（2026-10-21，v3）：**8 題全對**。目標 3/3、泛化 1/1、拒答 1/1、對照 3/3 回到 before 的樣子。v3 只改訓練參數、資料沒動，細節在 §12；怎麼確認「真的是訓練出來的」在 §13。
+- v2（2026-10-21）：**流程跑通，結果失敗**。目標題 3/4、拒答題 0/1、對照題 0/3，掛上 adapter 後中性 prompt 的輸出整個崩掉。§5 到 §9 記的是這一次。
+- 一句話：v2 失敗不是資料的鍋（v3 資料一樣），是 **步長**：lr 1e-4 × scale 20 × loss 含 prompt × 掛 16 層 MLP，四個放大器疊在一起。v3 把四個都收掉就過了。但 8 題裡 3 題對照題在訓練集裡，這個「全對」還沒經過 held-out 評測。
 
 ---
 
@@ -40,12 +41,16 @@
 |---|---|---|
 | `gen_data.py` | 資料產生器 v2，固定 `random.seed(42)`，產 `data/train.jsonl`、`data/valid.jsonl` | ✅ |
 | `run_eval.sh` | 固定 8 題評測，`T\|` 用任務 prompt、`P\|` 用中性 prompt，輸出 markdown | ✅ |
-| `data/train.jsonl` | 117 筆，mlx_lm chat 格式（`messages` 陣列） | ✅ |
+| `sweep_ckpt.sh` | 對 `adapters/` 每個 checkpoint 跑一次 `run_eval.sh`，輸出 `sweep/ckpt-NNNNNNN.md`，看學習曲線（§13） | ✅ |
+| `lora.yaml` | v3 起用的 LoRA 參數（rank / scale / dropout），CLI 沒有這幾個旗標，只能 `-c` 傳 | ✅ |
+| `data/train.jsonl` | 117 筆，mlx_lm chat 格式（`messages` 陣列），v2 / v3 共用 | ✅ |
 | `data/valid.jsonl` | 13 筆 | ✅ |
-| `before.md` | base 模型 8 題輸出（2026-10-21 17:23） | ✅ |
-| `after.md` | 掛 adapter 後同 8 題輸出（2026-10-21 17:31） | ✅ |
-| `adapters/adapter_config.json` | 這次訓練的完整參數，mlx_lm 自動寫出 | ✅ |
-| `adapters/*.safetensors` | adapter 權重，iter 100 / 200 各一份 + 最終版，每份 21 MB | ❌ `.gitignore` |
+| `before.md` | base 模型 8 題輸出（2026-10-21），v2 / v3 共用 | ✅ |
+| `after.md` | 掛 adapter 後同 8 題輸出。**目前是 v3**；v2 的版本在 git 歷史 `0529df6` | ✅ |
+| `adapters/adapter_config.json` | 訓練參數，mlx_lm 自動寫出。**目前是 v3**；v2 的在 `0529df6` | ✅ |
+| `adapters/*.safetensors` | adapter 權重。v3 每 20 步一份（10 MB，8 層）；`0000200_*` 是 v2 殘留（21 MB，16 層），v3 沒有第 200 步 | ❌ `.gitignore` |
+
+v3 直接覆蓋了 `adapters/` 跟 `after.md`，沒有另開目錄，所以 v2 的最終 adapter 已經沒了。之後每次實驗用不同的 `--adapter-path` 與輸出檔名。
 
 ---
 
@@ -208,6 +213,8 @@ train 的 prompt（system + user）總字元 5,246，assistant 答案總字元 3
 
 ## 10. 下一步實驗
 
+> 2026-10-21 更新：A、B、D、F 在 v3 一次全做了（見 §12），結果 8/8。C（通用題擴量）與 E（held-out 評測）還沒做，而且因為一次改了四個變因，**無法歸因**是哪一個救回來的。
+
 原則：**一次只改一個變因**，每次都重跑 `after`，before 不用重跑（除非改了評測題）。
 
 | 順序 | 改什麼 | 預期 | 代價 / trade-off |
@@ -233,3 +240,212 @@ train 的 prompt（system + user）總字元 5,246，assistant 答案總字元 3
 - before 不能省：沒有 before 就看不出「JSON 格式本來就會，schema 和換算是教會的」。
 - 只測目標題會誤判成功：這次目標題 3/4，光看這個會以為可以上線。
 - 檔案格式 ≠ 數值精度，再撞一次：adapter 是 safetensors 沒錯，但存的是 float32，所以是 21 MB 不是 10 MB。
+
+---
+
+## 12. 實驗 v3（2026-10-21）
+
+資料不動（還是 v2 的 117 / 13），只改訓練參數。四個放大器全部收掉：
+
+| 參數 | v2 | v3 | 動的是哪個軸 |
+|---|---|---|---|
+| `learning_rate` | 1e-4 | **1e-5** | 步長 |
+| `lora_parameters.scale` | 20 | **4**（`lora.yaml`） | 步長 |
+| `mask_prompt` | false | **true** | 方向（loss 只算 assistant token） |
+| `num_layers` | 16（layers 12–27） | **8**（layers 20–27） | 範圍 |
+| `batch_size` | 2 | 4 | 餵法（梯度平均 4 筆，比較穩） |
+| `iters` | 200 | 170 | 步數 |
+| epochs | 3.4 | **5.8**（170 × 4 / 117；本來是按 230 筆算 3 epochs，但資料沒重產） | |
+| `steps_per_eval` / `save_every` | 200 / 100 | 20 / 20 | 觀測 |
+| `val_batches` | 25 | -1（全跑） | 觀測 |
+| adapter 參數量 | 5,275,648 | **2,637,824**（8 層 × 7 模組） | |
+| adapter 檔案 | 21 MB | 10.5 MB | |
+
+指令：
+
+```bash
+mlx_lm.lora --model Qwen/Qwen2.5-1.5B-Instruct --train --data data \
+  -c lora.yaml --mask-prompt \
+  --learning-rate 1e-5 --batch-size 4 --iters 170 --num-layers 8 \
+  --steps-per-eval 20 --save-every 20 --val-batches -1 \
+  --adapter-path adapters
+```
+
+這次**又沒有 `tee`**，train / val loss 曲線第二次沒留下來。
+
+### 每個參數在做什麼
+
+先把訓練迴圈放回來，參數都掛在某一步上：
+
+```
+t0  拿 batch_size 筆資料                         ← 餵法：--batch-size / --iters / --mask-prompt
+t1  forward：base + LoRA 算預測                   ← 範圍：--num-layers / rank / keys
+t2  loss（mask-prompt 開：只算 assistant token）
+t3  backward：只算 LoRA 參數的梯度                 ← 方向：資料決定，參數改不了
+t4  adam：LoRA -= lr × 梯度；ΔW = scale × A@B      ← 步長：--learning-rate / scale
+t5  回 t0；每 steps-per-eval 步跑一次 valid         ← 觀測：--steps-per-eval / --save-every / --val-batches
+```
+
+調參順序永遠是 **方向 → 步長 → 範圍 → 步數**。v2 只動了步數，而且往放大的方向動。
+
+| 參數 | 意思 | v3 值 | 為什麼是這個值 | 什麼症狀才動它 |
+|---|---|---|---|---|
+| `--learning-rate` | t4 的步長係數，梯度乘上它才變成權重的改變量 | 1e-5 | mlx_lm 預設值。v2 的 1e-4 讓模型連訓練集的題都背不起來，那是「步太大跳過了」 | train loss 震盪或不降 → 砍半；loss 降很慢且目標題學不到 → 加倍 |
+| `scale`（`lora.yaml`） | 第二個步長係數。mlx 的 LoRA 是 `ΔW = scale × A@B`，等效 PEFT 的 alpha / r | 4 | mlx 預設 20 是配 lr 1e-5 用的；PEFT 慣例 alpha / r ≈ 2。4 是回到 LoRA 論文附近。跟 lr 相乘才是真正的步長 | 跟 lr 一起看；想固定 lr 只縮 LoRA 影響力時動它 |
+| `--mask-prompt` | t2 只對 assistant 段算 loss，system / user 段遮掉 | 開 | 關著時 102 筆任務 prompt 也被當目標學，一半以上梯度在教模型「生出 prompt」。SFT 的標準設定 | 永遠開。只有在做 continued pretraining（學文件本身）才關 |
+| `--num-layers` | 從最後一層往前數幾層掛 LoRA | 8（layers 20–27） | 越後面的層越接近輸出，改格式夠用；MLP 存事實，掛越多層忘越多 | 目標題學不到 → 放回 16；對照題漂移 → 縮到 4 或改 `keys` 只掛 attention |
+| `rank`（`lora.yaml`） | A、B 矩陣的內維度，ΔW 的秩，LoRA 能表達幾條獨立的「規則」 | 8 | 兩欄 schema 用不到 8。它決定參數量，不決定步長 | 任務複雜（正式 DSL）而 loss 卡住 → 16 或 32 |
+| `dropout`（`lora.yaml`） | 訓練時隨機丟掉 LoRA 輸入的比例 | 0 | 資料 117 筆、epochs 不到 6，先不加正則 | 真實資料過擬合明顯（val 升）→ 0.05 到 0.1 |
+| `--batch-size` | t0 一次拿幾筆，梯度是這幾筆的平均 | 4 | 平均的筆數越多單筆雜訊越小；同一個 batch 抽到通用題的機率也變高，錨才進得了同一步的梯度。代價是記憶體，這批短序列加不到 0.5 GB | OOM → 降；loss 很抖 → 升 |
+| `--iters` | 總步數。epochs = iters × batch / N | 170 | 本來按 230 筆算 3 epochs；資料沒重產所以實際 170 × 4 / 117 ≈ 5.8 | 最後才調。val loss 最低點在第幾步，iters 就設到那附近 |
+| `--steps-per-eval` | 每幾步跑一次 valid 算 val loss | 20 | 170 步給 8 個點，才看得到曲線。v2 的 200 等於只評最後一次 | 不用動 |
+| `--save-every` | 每幾步存一份 checkpoint | 20 | 跟 eval 對齊，val loss 最低那步才有檔可拿 | 磁碟吃緊才放大（每份 10 MB） |
+| `--val-batches` | 每次 eval 拿幾個 batch | -1（全跑） | valid 只有 13 筆，全跑才有意義 | 不用動 |
+| `--seed` | 資料 shuffle 與 LoRA A 矩陣初始化的種子 | 0 | 比較兩次實驗時必須一樣，否則差異可能來自亂數 | 不動 |
+| `-c lora.yaml` | YAML 設定檔，放 CLI 沒有的 `lora_parameters` | | CLI 旗標會蓋過 YAML 同名值，所以 YAML 只放 rank / scale / dropout / keys | |
+
+### 結果
+
+| # | 類 | before | v2 after | v3 after | 判定 |
+|---|---|---|---|---|---|
+| 1 | 目標 | 自創 schema、`"九五"` 沒換算 | `0.95 / low` | `{"rtp": 0.95, "volatility": "low"}` | ✅ |
+| 2 | 目標 | key 捏造 `waveform` | `0.93 / high` | `{"rtp": 0.93, "volatility": "high"}` | ✅ |
+| 3 | 目標 | `{"回饋率": 96, "頻道": "中波"}` | ❌ `high` | `{"rtp": 0.96, "volatility": "medium"}` | ✅ v2 錯的這題對了 |
+| 4 | 泛化 | `{"RTP": "九八", "波動": "超高"}` | `0.98 / high` | `{"rtp": 0.98, "volatility": "high"}` | ✅ |
+| 5 | 拒答 | `{"query": "昨天的 RTP 报表"}` | ❌ 捏造 `0.91 / high` | `{"error": "not a config request"}` | ✅ 一字不差是訓練集的字串 |
+| 6 | 對照 | 一段介紹（66 token） | `API\n設定所有 API` | 一段介紹（66 token），內容跟 before 不完全一樣 | ✅ 沒崩 |
+| 7 | 對照 | 正確 code + 說明（80 token 截斷） | 壞 JSON | 正確 code + 說明（80 token 截斷） | ✅ |
+| 8 | 對照 | `"The weather is very good today."` | `API\nPID 的` | `"The weather is great today."` | ✅ 沒崩，但字變了 |
+
+### 讀法
+
+- 第 5 題是最硬的證據：`{"error": "not a config request"}` 這個字串 base 沒看過（before 吐的是 `{"query": ...}`），只有訓練集裡有，它一字不差出現，只能是學來的。
+- 第 6、8 題「變正常」不等於「沒變」：6 題的措辭和 8 題的 `very good` → `great` 都跟 before 不同。adapter 在中性 prompt 下仍然在作用，只是作用小到沒破壞。要量「變了多少」得用 held-out 的對照題，而且判定標準是「跟 before 像不像」而不是「對不對」。
+- 5.8 epochs 比預計的 3 多將近一倍，對照題還是沒崩。反推 v2 的問題確實不在 epochs，在步長（上一版 §9 的排序對了）。
+- 一次改四個變因所以不能說「是 lr 救的」。要歸因，從 v3 出發一次放回一個：先把 scale 放回 20、再把 num_layers 放回 16、再關 mask_prompt，哪一步對照題開始壞，哪一個就是主因。
+
+### 權重層的學習曲線（不用跑 GPU）
+
+LoRA 的 B 矩陣初始化是全零，`ΔW = scale × A @ B`。每個 checkpoint 直接讀 safetensors 算 norm：
+
+| iter | ‖B‖_F | scale × ‖A@B‖_F | 每 20 步增量 |
+|---|---|---|---|
+| 20 | 0.903 | 2.118 | |
+| 40 | 1.240 | 2.937 | +0.819 |
+| 60 | 1.349 | 3.202 | +0.265 |
+| 80 | 1.418 | 3.371 | +0.169 |
+| 100 | 1.469 | 3.500 | +0.129 |
+| 120 | 1.512 | 3.610 | +0.110 |
+| 140 | 1.549 | 3.704 | +0.094 |
+| 160 | 1.578 | 3.778 | +0.074 |
+| 170 | 1.593 | 3.816 | +0.038 |
+
+對照 v2 最終版：‖B‖_F = 9.24、scale × ‖A@B‖_F ≈ 185（scale 20、16 層）。v3 的 ΔW 總量只有 v2 的 **2%**，但目標題學得更好。這就是「方向對了步長小也到得了，方向錯了步長大只會飛出去」。
+
+增量遞減代表接近收斂；第 40 步之後每 20 步的改變已經很小，表示 2 到 3 epochs 時規則大致學完，後面 3 個 epochs 在微調。
+
+---
+
+## 13. 怎麼驗證「真的被訓練到」
+
+「after 看起來正常」只排除了崩潰，證明不了學習。證據分三層，由弱到強：
+
+| 層 | 方法 | 這次有沒有 | 證明什麼 |
+|---|---|---|---|
+| 權重 | `lora_b` 非零、norm 隨 checkpoint 單調上升且收斂（§12 的表） | ✅ | 梯度更新發生了、方向穩定。證明不了學到的是對的東西 |
+| 行為：before vs after | 同 base、同 prompt、同 greedy 解碼，唯一變因是 `--adapter-path`，輸出不同 | ✅ | 差異只能來自 adapter |
+| 行為：訓練集獨有字串 | after 輸出訓練集才有、base 沒看過的字串（第 5 題的 `{"error": ...}`） | ✅ | 這段行為是學來的，不是本來就會 |
+| 行為：held-out 泛化 | 訓練集沒出現的組合答對（第 4 題「超高」→ `high`） | ✅ 1 題 | 學到規則不是背題。1 題太少 |
+| 曲線：checkpoint sweep | `./sweep_ckpt.sh` 對每個 checkpoint 跑同 8 題，看答對數隨 iter 變化 | ⬜ 還沒跑 | 哪一步學會、哪一步開始退，比最終版一個點有說服力 |
+| 曲線：train / val loss | `2>&1 \| tee train.log`，valid 分層含三類 | ⬜ 兩次都沒存 | 過擬合從哪一步開始 |
+| 對照：held-out 中性題 | 不在訓練集的對照題，比對 after 與 before 的文字差異 | ⬜ 還沒做 | adapter 對任務外輸入「改了多少」，不只是「有沒有崩」 |
+| 對照：拔掉 adapter | 不帶 `--adapter-path` 再跑一次，應該與 before 一字不差 | ⬜ 可以順手做 | 確認 base 權重真的沒動、差異不是環境漂移 |
+
+幾個原則：
+
+- **單一變因**：before / after 之間只能差 adapter。模型版本、prompt 字串、`--max-tokens`、解碼參數都要一樣。`run_eval.sh` 把這些寫死就是為了這個。
+- **找訓練集獨有的輸出**：設計資料時刻意放一個 base 絕對不會自己生出來的 token 序列（一個固定錯誤碼、一個自訂 key 名），它變成免費的「有學到」探針。
+- **一個點不是曲線**：最終版答對不代表中間沒有先學會再退步。有 checkpoint 就跑 sweep。
+- **「正常」要量化**：對照題的判定不是人眼看「像不像人話」，是跟 before 的輸出比。可以先用最笨的「完全相同 / 不同」計數，再升級成 token 重疊率。
+
+### 驗證這次 v3 的下一步
+
+1. `./sweep_ckpt.sh`：9 個 checkpoint × 8 題，M1 上約 5 分鐘，看第 5 題（拒答）跟第 3 題（medium）是在第幾步學會的。
+2. 加 10 題不在訓練集的中性題，跑 before 與 after，數有幾題輸出一字不差。
+3. 下次訓練一定 `tee`。
+
+---
+
+## 14. checkpoint 怎麼用
+
+### 檔案長什麼樣
+
+```
+adapters/
+├ adapter_config.json              訓練參數，整個目錄共用一份
+├ 0000020_adapters.safetensors     第 20 步的 LoRA 權重（--save-every 20）
+├ 0000040_adapters.safetensors
+├ ...
+├ 0000160_adapters.safetensors
+└ adapters.safetensors             最後一步（170）的權重，訓練結束時另存
+```
+
+- 每份只有 LoRA 的 A / B 矩陣，不含 base。v3 一份 10.5 MB（8 層），v2 一份 21 MB（16 層）。
+- 檔名 `{iter:07d}_adapters.safetensors` 是 mlx_lm 寫死的格式，`adapters.safetensors` 永遠是最終版。
+- `.safetensors` 不進 git，`adapter_config.json` 進。要重現某份 checkpoint 就是「同 config + 同 seed + 同資料 + 跑到那一步」。
+
+### 推理時掛某個 checkpoint
+
+`mlx_lm.generate --adapter-path` 要的是**目錄**，不是檔案，目錄裡要有 `adapters.safetensors` 和 `adapter_config.json`。所以挑第 100 步：
+
+```bash
+mkdir -p ck-100
+cp adapters/adapter_config.json ck-100/
+ln -s "$PWD/adapters/0000100_adapters.safetensors" ck-100/adapters.safetensors
+
+mlx_lm.generate --model Qwen/Qwen2.5-1.5B-Instruct --adapter-path ck-100 \
+  --system-prompt "你是遊戲設定助理。把口語需求轉成 JSON，只輸出 JSON。" \
+  --prompt "RTP 九五，低波動" --max-tokens 80
+
+./run_eval.sh ckpt-100.md ck-100        # 或直接丟給評測腳本
+```
+
+`sweep_ckpt.sh` 就是把這三行對每一份 checkpoint 跑一遍，臨時目錄放 `sweep/.ck-*`。
+
+### 挑哪一份
+
+不是最後一份。順序：
+
+1. 有 `train.log` 時，看 **val loss 最低**在第幾步，拿那份。val loss 從最低點開始往上就是開始背題。
+2. 沒 log（這次）就跑 `sweep_ckpt.sh`，挑「目標題全對、對照題沒退」的**最早**那份。最早是因為走越少步，對任務外輸入的改動越小。
+3. 兩份都過的話，看 §12 的 norm 表，增量已經很小的那段隨便挑都差不多。
+
+### 從 checkpoint 續訓
+
+```bash
+mlx_lm.lora --model Qwen/Qwen2.5-1.5B-Instruct --train --data data \
+  -c lora.yaml --mask-prompt --learning-rate 1e-5 --batch-size 4 --num-layers 8 \
+  --resume-adapter-file adapters/0000100_adapters.safetensors \
+  --iters 50 --adapter-path adapters-resumed
+```
+
+- `--resume-adapter-file` 只載入 LoRA 權重，**optimizer state 與步數不接續**：adam 從零開始、iter 從 1 數。所以 `--iters 50` 是「再走 50 步」，不是「走到 50」。
+- rank / scale / num_layers 必須跟原本一樣，不然 shape 對不上會載入失敗。
+- 用途：想從 val loss 最低點用更小的 lr 再磨一下、或加了新資料想接著練。跟從頭跑比的代價是：optimizer 重新暖機，前幾步會有點抖。
+
+### 把 checkpoint 變成可部署的模型
+
+```bash
+mlx_lm.fuse --model Qwen/Qwen2.5-1.5B-Instruct --adapter-path ck-100 --save-path fused-100
+# → fused-100/ 是合併後的完整 HF 格式權重（safetensors + config + tokenizer，約 3 GB）
+#   mlx_lm.generate --model fused-100 直接載；vLLM 也吃這個目錄
+
+# 給 Ollama：mlx_lm.fuse 的 --export-gguf 在 mlx-lm 0.32 只接受 llama / mixtral / mistral，
+# model_type=qwen2 會直接 raise。Qwen 要走 llama.cpp 的轉換器：
+python llama.cpp/convert_hf_to_gguf.py fused-100 --outfile fused-100/model.gguf --outtype f16
+# → ollama create rtp-lora -f Modelfile（Modelfile 內 FROM ./fused-100/model.gguf）
+```
+
+- fuse 是 `W' = W + scale × A@B` 算一次寫回去，之後推理不多一次矩陣乘法。代價：每個 checkpoint 一份 3 GB，而且 fuse 完就分不出哪段是 LoRA。
+- 不 fuse、直接 `--adapter-path`：多幾 MB、可以隨時換 checkpoint、vLLM 可以 per-request 選 adapter。開發期用這個，上線時再決定要不要 fuse。
+- 轉成 GGUF 之後一定用 Ollama 再跑一次同樣 8 題。GGUF 那邊通常會再量化（Ollama 預設拉 Q4），行為可能跟 mlx 上的 fp16 不完全一樣；而且 system prompt 要透過 Modelfile 的 `SYSTEM` 或每次請求帶，必須跟訓練時一字不差。
