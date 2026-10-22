@@ -42,6 +42,8 @@
 | `gen_data.py` | 資料產生器 v2，固定 `random.seed(42)`，產 `data/train.jsonl`、`data/valid.jsonl` | ✅ |
 | `run_eval.sh` | 固定 8 題評測，`T\|` 用任務 prompt、`P\|` 用中性 prompt，輸出 markdown | ✅ |
 | `sweep_ckpt.sh` | 對 `adapters/` 每個 checkpoint 跑一次 `run_eval.sh`，輸出 `sweep/ckpt-NNNNNNN.md`，看學習曲線（§13） | ✅ |
+| `score_eval.py` | 把任意幾份 `run_eval.sh` 的輸出變成一張分數表：[T] 題對答案、[P] 題跟 before 比（§13） | ✅ |
+| `sweep/ckpt-*.md` | sweep 的結果，是實驗記錄，**要進 git**；`sweep/.ck-*/` 是臨時目錄（config + 指到 checkpoint 的 symlink），已 ignore | ✅ / ❌ |
 | `lora.yaml` | v3 起用的 LoRA 參數（rank / scale / dropout），CLI 沒有這幾個旗標，只能 `-c` 傳 | ✅ |
 | `data/train.jsonl` | 117 筆，mlx_lm chat 格式（`messages` 陣列），v2 / v3 共用 | ✅ |
 | `data/valid.jsonl` | 13 筆 | ✅ |
@@ -368,9 +370,51 @@ LoRA 的 B 矩陣初始化是全零，`ΔW = scale × A @ B`。每個 checkpoint
 - **一個點不是曲線**：最終版答對不代表中間沒有先學會再退步。有 checkpoint 就跑 sweep。
 - **「正常」要量化**：對照題的判定不是人眼看「像不像人話」，是跟 before 的輸出比。可以先用最笨的「完全相同 / 不同」計數，再升級成 token 重疊率。
 
+### 評測這組工具怎麼用
+
+三個腳本各管一段，產物都是 markdown，放在 `ft-poc/` 下：
+
+```
+run_eval.sh   OUT.md [ADAPTER_DIR]     跑 8 題 → 一份 md（before.md / after.md / sweep/ckpt-*.md 都是它產的）
+sweep_ckpt.sh [ADAPTER_DIR]            對每個 checkpoint 呼叫 run_eval.sh → sweep/ckpt-NNNNNNN.md
+score_eval.py [--ref before.md] FILE…  讀這些 md → 一張分數表（stdout，貼進 README 用）
+```
+
+每份 md 的結構都一樣：`## [T|P] 題目` 一段、`==========` 夾著模型輸出、再來 `Generation: N tokens` 與 peak memory。`score_eval.py` 就靠這三個錨點解析，所以**不要手改這些檔**。
+
+判定規則（寫死在 `score_eval.py` 的 `EXPECTED`，改了 `run_eval.sh` 的題目要一起改）：
+
+| 題型 | 怎麼判 | 符號 |
+|---|---|---|
+| [T] 目標 / 泛化 / 拒答 | 輸出 `json.loads` 後跟期望 dict 完全相等 | ✅ / ✗ / ✗json（連 JSON 都不是） |
+| [P] 對照 | 跟 `--ref`（預設第一個 `before*.md`）同題輸出比 | `=` 一字不差 / `≈` 不同但沒崩 / `✗` 崩（< 12 token、或中性 prompt 下吐 JSON） |
+
+目前三次的分數：
+
+```
+$ python score_eval.py before.md after-v2.md after.md      # after-v2.md 從 git 0529df6 拿
+| file        | T1 | T2 | T3 | T4 | T5 | P6 | P7 | P8 | 目標+泛化+拒答 | 對照沒崩 |
+| before.md   | ✗  | ✗  | ✗  | ✗  | ✗  | =  | =  | =  | 0/5 | 3/3 |
+| after-v2.md | ✅ | ✅ | ✗  | ✅ | ✗  | ✗  | ✗  | ✗  | 3/5 | 0/3 |
+| after.md    | ✅ | ✅ | ✅ | ✅ | ✅ | ≈  | ≈  | ≈  | 5/5 | 3/3 |
+```
+
+兩欄要一起看：右邊那欄掉到 0/3 就是災難性遺忘，左邊再高都不能上線。`≈` 代表 adapter 在中性 prompt 下仍在作用，只是沒破壞；要知道「改了多少」得用 held-out 的 [P] 題。
+
+典型流程：
+
+```bash
+./run_eval.sh before.md                  # 只在評測題改過時重跑
+mlx_lm.lora ... --adapter-path adapters-vN 2>&1 | tee train-vN.log
+./run_eval.sh after-vN.md adapters-vN
+python score_eval.py before.md after-v*.md       # 跨版本比較
+./sweep_ckpt.sh adapters-vN                      # 想看學習曲線時
+python score_eval.py before.md sweep/ckpt-*.md   # 哪一步學會、哪一步開始退
+```
+
 ### 驗證這次 v3 的下一步
 
-1. `./sweep_ckpt.sh`：9 個 checkpoint × 8 題，M1 上約 5 分鐘，看第 5 題（拒答）跟第 3 題（medium）是在第幾步學會的。
+1. `./sweep_ckpt.sh`：9 個 checkpoint × 8 題，M1 上約 8 分鐘，看第 5 題（拒答）跟第 3 題（medium）是在第幾步學會的。第一次跑只到第 40 步就中斷了，`sweep/ckpt-*.md` 沒留下。
 2. 加 10 題不在訓練集的中性題，跑 before 與 after，數有幾題輸出一字不差。
 3. 下次訓練一定 `tee`。
 
