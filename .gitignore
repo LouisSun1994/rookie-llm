@@ -5,6 +5,7 @@ ft/
 ft-poc/adapters*/*.safetensors
 # sweep_ckpt.sh temp dirs (symlinks to checkpoints); the ckpt-*.md results stay
 ft-poc/sweep/.ck-*/
+ft-poc/sweep/sweep.log
 
 __pycache__/
 .DS_Store

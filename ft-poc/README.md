@@ -50,7 +50,7 @@
 | `before.md` | base 模型 8 題輸出（2026-10-21），v2 / v3 共用 | ✅ |
 | `after.md` | 掛 adapter 後同 8 題輸出。**目前是 v3**；v2 的版本在 git 歷史 `0529df6` | ✅ |
 | `adapters/adapter_config.json` | 訓練參數，mlx_lm 自動寫出。**目前是 v3**；v2 的在 `0529df6` | ✅ |
-| `adapters/*.safetensors` | adapter 權重。v3 每 20 步一份（10 MB，8 層）；`0000200_*` 是 v2 殘留（21 MB，16 層），v3 沒有第 200 步 | ❌ `.gitignore` |
+| `adapters/*.safetensors` | adapter 權重。v3 每 20 步一份（10 MB，8 層）。v2 殘留的第 200 步已改名 `v2-leftover-0000200_adapters.safetensors`（21 MB，16 層），避免被 `sweep_ckpt.sh` 的 `0*_` glob 撈到配錯 config | ❌ `.gitignore` |
 
 v3 直接覆蓋了 `adapters/` 跟 `after.md`，沒有另開目錄，所以 v2 的最終 adapter 已經沒了。之後每次實驗用不同的 `--adapter-path` 與輸出檔名。
 
@@ -346,6 +346,50 @@ LoRA 的 B 矩陣初始化是全零，`ΔW = scale × A @ B`。每個 checkpoint
 
 增量遞減代表接近收斂；第 40 步之後每 20 步的改變已經很小，表示 2 到 3 epochs 時規則大致學完，後面 3 個 epochs 在微調。
 
+### checkpoint sweep：行為層的學習曲線（2026-10-22）
+
+`./sweep_ckpt.sh` 對 8 個 checkpoint 各跑同 8 題，`score_eval.py` 打分：
+
+```
+$ python score_eval.py before.md sweep/ckpt-*.md after.md
+| file             | T1 | T2 | T3   | T4 | T5 | P6 | P7 | P8 | 目標+泛化+拒答 | 對照沒崩 |
+| before.md        | ✗  | ✗  | ✗    | ✗  | ✗  | =  | =  | =  | 0/5 | 3/3 |
+| ckpt-0000020.md  | ✗  | ✗  | ✗    | ✅ | ✗  | ≈  | ≈  | =  | 1/5 | 3/3 |
+| ckpt-0000040.md  | ✅ | ✅ | ✗    | ✅ | ✗  | ≈  | ≈  | =  | 3/5 | 3/3 |
+| ckpt-0000060.md  | ✅ | ✅ | ✗    | ✅ | ✗  | ≈  | ≈  | =  | 3/5 | 3/3 |
+| ckpt-0000080.md  | ✅ | ✅ | ✗    | ✅ | ✅ | ≈  | ≈  | =  | 4/5 | 3/3 |
+| ckpt-0000100.md  | ✅ | ✅ | ✗dup | ✅ | ✅ | ≈  | ≈  | ≈  | 4/5 | 3/3 |
+| ckpt-0000120.md  | ✅ | ✅ | ✗dup | ✅ | ✅ | ≈  | ≈  | ≈  | 4/5 | 3/3 |
+| ckpt-0000140.md  | ✅ | ✅ | ✅   | ✅ | ✅ | ≈  | ≈  | ≈  | 5/5 | 3/3 |
+| ckpt-0000160.md  | ✅ | ✅ | ✅   | ✅ | ✅ | ≈  | ≈  | ≈  | 5/5 | 3/3 |
+| after.md (170)   | 同上 | | | | | | | | 5/5 | 3/3 |
+```
+
+T3（「回饋率 96%，中波」）和 T5（拒答）的原文，看它們是怎麼一步步變對的：
+
+| iter | T3 輸出 | T5 輸出 |
+|---|---|---|
+| 0（before） | `{"回饋率": 96, "頻道": "中波"}` 包在 ` ```json ` 裡 | `{"query": "昨天的 RTP 报表"}` |
+| 20 | `{"feedback_rate": 0.96, "frequency": "midwave"}` | 同 before |
+| 40 | `{"rtp": 0.96, "volatility": "medium", "volatility_scale": 0.5}` | `{"rtp_report": "rtp_report yesterday"}` |
+| 60 | 同 40 | `{"rtp": "rtp_report", "date": "yesterday"}` |
+| 80 | `{..., "volatility_scale": "medium"}` 多一個 key | `{"error": "not a config request"}` ✅ |
+| 100 | `{"rtp": 0.96, "volatility": "medium", "volatility": "medium"}` **重複 key** | ✅ |
+| 120 | 同 100 | ✅ |
+| 140 | `{"rtp": 0.96, "volatility": "medium"}` ✅ | ✅ |
+
+### 讀法
+
+- **學習有順序，而且順序是「資料裡多的先學」**：
+  1. iter 20：輸出格式（丟掉 ` ```json ` 包裝、英文 key）先變，但值還沒換算（T1 仍是 `"九五"`），泛化題 T4 反而先對。
+  2. iter 40：值的換算與兩檔 volatility 對了（T1、T2），91 筆目標題的主規則到這裡學完。這跟 §12 norm 表「40 步之後增量變小」一致。
+  3. iter 80：拒答才學會。11 筆反例是最少的類，要走到 2.7 epochs 才壓過「看到 RTP 就吐設定」。
+  4. iter 140：多餘 key 才消失。「不要多生東西」是最後學會的，中間還經過「多一個 key」→「重複 key」兩個階段。
+- **最早全對的 checkpoint 是 140，不是 100**。`json.loads` 預設吞掉重複 key，第一版 `score_eval.py` 把 100、120 判成 ✅；加了 `object_pairs_hook` 才抓到。評分器也要被驗。
+- **對中性 prompt 的影響隨步數累積**：P8（翻譯）到 iter 80 都跟 before 一字不差，100 起變成 `great`；P6 從 40 起措辭就不同。P6 在 iter 20 有一次只生 19 token 的抖動，40 之後恢復。這是「adapter 越練越滲進任務外輸入」的直接證據，只是這次幅度小。
+- **挑哪一份**：按 §14 的規則「目標題全對、對照題沒退的最早一份」是 140。它跟 170 在 8 題上沒差，但 ΔW 更小（norm 1.549 vs 1.593）。
+- 下次資料有 230 筆、epochs 回到 3 時，這條曲線會整個往右拉，拒答與去重複 key 可能學不完。到時候 iters 要按這張表反推，不是直接照抄 170。
+
 ---
 
 ## 13. 怎麼驗證「真的被訓練到」
@@ -386,7 +430,7 @@ score_eval.py [--ref before.md] FILE…  讀這些 md → 一張分數表（stdo
 
 | 題型 | 怎麼判 | 符號 |
 |---|---|---|
-| [T] 目標 / 泛化 / 拒答 | 輸出 `json.loads` 後跟期望 dict 完全相等 | ✅ / ✗ / ✗json（連 JSON 都不是） |
+| [T] 目標 / 泛化 / 拒答 | 輸出 `json.loads` 後跟期望 dict 完全相等；用 `object_pairs_hook` 抓重複 key | ✅ / ✗ / ✗json（連 JSON 都不是）/ ✗dup（重複 key） |
 | [P] 對照 | 跟 `--ref`（預設第一個 `before*.md`）同題輸出比 | `=` 一字不差 / `≈` 不同但沒崩 / `✗` 崩（< 12 token、或中性 prompt 下吐 JSON） |
 
 目前三次的分數：
@@ -414,7 +458,7 @@ python score_eval.py before.md sweep/ckpt-*.md   # 哪一步學會、哪一步�
 
 ### 驗證這次 v3 的下一步
 
-1. `./sweep_ckpt.sh`：9 個 checkpoint × 8 題，M1 上約 8 分鐘，看第 5 題（拒答）跟第 3 題（medium）是在第幾步學會的。第一次跑只到第 40 步就中斷了，`sweep/ckpt-*.md` 沒留下。
+1. ~~`./sweep_ckpt.sh`~~ 已跑（2026-10-22），結果在 §12：拒答 iter 80 學會、T3 乾淨 JSON 要到 140。
 2. 加 10 題不在訓練集的中性題，跑 before 與 after，數有幾題輸出一字不差。
 3. 下次訓練一定 `tee`。
 

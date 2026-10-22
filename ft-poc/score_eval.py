@@ -6,7 +6,7 @@
 #   python score_eval.py --ref before.md after.md ...       # 指定對照基準（預設：第一個叫 before*.md 的）
 #
 # 判定規則：
-#   [T] 題：輸出 json.loads 後跟 EXPECTED 比，完全相等才 ✅
+#   [T] 題：輸出 json.loads 後跟 EXPECTED 比，完全相等才 ✅；重複 key 判 ✗dup（json.loads 預設會吞掉）
 #   [P] 題：跟 --ref 的同題輸出比
 #         =  一字不差
 #         ≈  不同但沒崩（生成 ≥ 12 token，且不含 rtp / { ）
@@ -48,12 +48,21 @@ def strip_fence(s):
     return s.strip()
 
 
+def _no_dup(pairs):
+    keys = [k for k, _ in pairs]
+    if len(keys) != len(set(keys)):
+        raise ValueError("duplicate key")
+    return dict(pairs)
+
+
 def judge_t(prompt, output):
     exp = EXPECTED.get(prompt)
     if exp is None:
         return "?"
     try:
-        got = json.loads(strip_fence(output))
+        got = json.loads(strip_fence(output), object_pairs_hook=_no_dup)
+    except ValueError as e:
+        return "✗dup" if "duplicate" in str(e) else "✗json"
     except Exception:
         return "✗json"
     return "✅" if got == exp else "✗"
