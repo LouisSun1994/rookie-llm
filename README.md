@@ -120,7 +120,8 @@
 
 | 路徑 | 內容 |
 |---|---|
-| `notes/` | 學習筆記，依序編號 `NN-主題.md` |
+| `notes/` | 學習筆記，依序編號 `NN-主題.md`：沿一條概念線往下挖的主線 |
+| `cases/` | 實例研究，獨立編號 `NN-主題.md`：借一個真實產品或權威案例來理解概念，結構與 notes 相同，只保留定位該 case 所需的最小骨架，細節回指對應的 note |
 | `ft-poc/` | 第一次 LoRA POC：資料產生器、評測腳本、before / after 輸出、adapter 設定與失敗分析（見 [ft-poc/README.md](ft-poc/README.md)） |
 | `ft/` | mlx-lm 的 Python venv，不進 git |
 
@@ -133,6 +134,12 @@
 | [03](notes/03-model-families-engines-orchestration.md) | 模型 vs 引擎（權重沒有說明書、引擎的四塊）、模型種類 = 輸入→輸出 × 生成方式、自回歸 vs diffusion、CNN / UNet vs Transformer / DiT、latent / embedding / hidden state、VLM、Ollama / ComfyUI / 自帶 pipeline 對照、應用層 tool call 編排、TRELLIS.2 事實表、產圖地端部署 | 2026-10-16 |
 | [04](notes/04-finetune-distill-lora-rank.md) | fine-tune 的定義與術語階梯、黑箱 / 白箱蒸餾、三條獨立軸、改 context vs 改 W、Modelfile、矩陣的秩、LoRA 是約束不是優越、merge 與推論成本、QLoRA 訓練 VRAM 估算、safetensors vs GGUF、格式 × 引擎 × 環境 | 2026-10-16 |
 | [05](notes/05-harness-and-first-lora-poc.md) | harness / 引擎 / 模型的職責邊界、資料來源只有權重與 prompt、agent loop 與 RAG 時間軸、改認知的三條路（prompt / 權重 / logit_bias）、SFT 與 LoRA 產物、訓練機制與過擬合、第一次 LoRA POC 的資料集與評測設計、災難性遺忘 | 2026-10-20 ～ 2026-10-21 |
+
+### 實例研究索引
+
+| 編號 | 案例 | 借它理解的概念 | 日期 |
+|---|---|---|---|
+| [Case 01](cases/01-phison-aidaptiv-ssd-offload-igpu.md) | 群聯 aiDAPTIV+（iGPU + SSD 補記憶體） | iGPU 的 XVE / XMX 與統一記憶體、decode 頻寬綁定 vs prefill 運算綁定、SSD offload 的成立條件（T_搬 ≤ T_算、MoE）、引擎內的配置器 / 預取器住哪一層、計算路 vs 存取路、GPU 無標準 vs NVMe 有標準、綁定對象分析 | 2026-10-30 |
 
 ## 階段路線圖
 
@@ -152,6 +159,8 @@
 - 每篇筆記開頭標記日期與當時的階段定位
 - 被校正過的誤解集中記在各篇的「常見陷阱」或「誤解修正」節，不刪舊的錯誤理解
 - 模型尺寸、版本、價格等會變動的事實，標記整理當時的年月
+- 標「補強」「補充」的 blockquote 是整理進 repo 時加註、尚未經導師確認的內容；經 /校正 確認後併入正文並移除標記
+- 概念主線放 `notes/`；借真實產品或權威案例切入的放 `cases/`，兩邊編號各自獨立，case 筆記的 H1 以 `Case NN` 起頭
 
 ## 授權
 
