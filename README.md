@@ -5,7 +5,7 @@
 ## 背景
 
 - 後端 / 基礎設施背景，第一次自建地端 LLM 服務
-- 動機：公司內部約 40 人試用，資料敏感所以選地端；後續要讓模型理解公司黑話與內部 DSL
+- 動機：內部約 40 人試用，資料敏感所以選地端；後續要讓模型理解內部黑話與 DSL
 - 學習方式：概念優先（conceptual-first），先建立全貌再動手部署
 
 ## 學習方式
@@ -29,7 +29,7 @@
 
 # 背景與目標（判斷深淺的依據）
 - 我是後端 / 基礎設施背景，熟 Docker、Linux、API 設計，不熟 PyTorch 與訓練
-- 實際目標：公司內部約 40 人試用的地端聊天服務，先 Ollama / vLLM + Open WebUI，之後 RAG，最後 fine-tune 讓模型理解公司黑話與內部 DSL
+- 實際目標：內部約 40 人試用的地端聊天服務，先 Ollama / vLLM + Open WebUI，之後 RAG，最後 fine-tune 讓模型理解內部黑話與 DSL
 - 資料敏感，所有東西都在區網內；本機驗證環境是 M1 Mac，正式機是 Linux + NVIDIA
 - 這個 repo 的 `notes/` 是我已經建立的模型，回答前先對照，不要重講我已經懂的，直接接在上面往下挖
 
@@ -71,6 +71,7 @@
 - 設定檔與指令註解繁體中文
 - 區分「我的用詞不對」和「我的概念不對」，前者輕帶過，後者認真修
 - 「embedding」「batch」「slot」「harness」這類一詞多義的，先問我或先說明你用的是哪個意思
+- 筆記與範例裡不出現可識別我公司的資訊（公司名稱、產品／專案代號、內部路徑、人名、帳號）；需要舉例時用中性佔位符（`/Users/admin/work`、`some-repo`），背景只說「內部」「團隊」
 
 # /note 產出規範
 我說「/note」或「幫我整理成 note」時，產出一份 Markdown 檔案（檔名 `NN-<slug>.md`，NN 接續上一份、兩位數補零）：
@@ -141,6 +142,7 @@
 | 編號 | 案例 | 借它理解的概念 | 日期 |
 |---|---|---|---|
 | [Case 01](cases/01-phison-aidaptiv-ssd-offload-igpu.md) | 群聯 aiDAPTIV+（iGPU + SSD 補記憶體） | iGPU 的 XVE / XMX 與統一記憶體、decode 頻寬綁定 vs prefill 運算綁定、SSD offload 的成立條件（T_搬 ≤ T_算、MoE）、引擎內的配置器 / 預取器住哪一層、計算路 vs 存取路、GPU 無標準 vs NVMe 有標準、綁定對象分析 | 2026-10-30 |
+| [Case 02](cases/02-claude-code-sandbox-seatbelt-design.md) | Claude Code 的 sandbox（harness 借 macOS Seatbelt 關 shell） | harness 層的 least-privilege 設計、邊界畫在工具級（只關 Bash）、settings 四層巢狀 → SBPL → kernel、出題 / 閱卷分開、網路走本機 proxy 做域名白名單、default-deny 的 fail-closed、對 Apple deprecated API 的依賴面、錯誤字串分層診斷、自寫 harness 接地端模型時的同一組問題 | 2026-11-04 |
 
 ## 階段路線圖
 
@@ -162,6 +164,7 @@
 - 模型尺寸、版本、價格等會變動的事實，標記整理當時的年月
 - 標「補強」「補充」的 blockquote 是整理進 repo 時加註、尚未經導師確認的內容；經 /校正 確認後併入正文並移除標記
 - 概念主線放 `notes/`；借真實產品或權威案例切入的放 `cases/`，兩邊編號各自獨立，case 筆記的 H1 以 `Case NN` 起頭
+- 不出現任何可識別公司的內容：公司名稱、產品／專案代號、內部路徑、同事姓名與帳號。範例路徑與代號一律用中性佔位符（`/Users/admin/work`、`some-repo`），需求背景只用「內部」「團隊」這類泛稱
 
 ## 授權
 
