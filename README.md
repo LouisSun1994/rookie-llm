@@ -129,20 +129,20 @@
 
 ### 筆記索引
 
-| 編號 | 主題 | 日期 |
-|---|---|---|
-| [01](notes/01-local-llm-deploy-rag-finetune.md) | 三層架構、部署路線圖、Ollama vs vLLM、token 生成流程、量化與模型格式、純推理 / RAG / fine-tune、LoRA 與 QLoRA、黑話與 DSL 策略、Claude 整合 | 2026-10-15 |
-| [02](notes/02-m1-ollama-and-docker-desktop-networking.md) | SLM 的定義與尺寸區間、dense vs MoE 與 FFN、M1 unified memory 估算、Ollama 啟動方式與模型 tag、`host.docker.internal` 在 Mac / Linux 的差異、Docker Desktop 的 VM + userspace proxy 網路層 | 2026-10-16 |
-| [03](notes/03-model-families-engines-orchestration.md) | 模型 vs 引擎（權重沒有說明書、引擎的四塊）、模型種類 = 輸入→輸出 × 生成方式、自回歸 vs diffusion、CNN / UNet vs Transformer / DiT、latent / embedding / hidden state、VLM、Ollama / ComfyUI / 自帶 pipeline 對照、應用層 tool call 編排、TRELLIS.2 事實表、產圖地端部署 | 2026-10-16 |
-| [04](notes/04-finetune-distill-lora-rank.md) | fine-tune 的定義與術語階梯、黑箱 / 白箱蒸餾、三條獨立軸、改 context vs 改 W、Modelfile、矩陣的秩、LoRA 是約束不是優越、merge 與推論成本、QLoRA 訓練 VRAM 估算、safetensors vs GGUF、格式 × 引擎 × 環境 | 2026-10-16 |
-| [05](notes/05-harness-and-first-lora-poc.md) | harness / 引擎 / 模型的職責邊界、資料來源只有權重與 prompt、agent loop 與 RAG 時間軸、改認知的三條路（prompt / 權重 / logit_bias）、SFT 與 LoRA 產物、訓練機制與過擬合、第一次 LoRA POC 的資料集與評測設計、災難性遺忘 | 2026-10-20 ～ 2026-10-21 |
+| 編號 | 主題 |
+|---|---|
+| [01](notes/01-local-llm-deploy-rag-finetune.md) | 三層架構、部署路線圖、Ollama vs vLLM、token 生成流程、量化與模型格式、純推理 / RAG / fine-tune、LoRA 與 QLoRA、黑話與 DSL 策略、Claude 整合 |
+| [02](notes/02-m1-ollama-and-docker-desktop-networking.md) | SLM 的定義與尺寸區間、dense vs MoE 與 FFN、M1 unified memory 估算、Ollama 啟動方式與模型 tag、`host.docker.internal` 在 Mac / Linux 的差異、Docker Desktop 的 VM + userspace proxy 網路層 |
+| [03](notes/03-model-families-engines-orchestration.md) | 模型 vs 引擎（權重沒有說明書、引擎的四塊）、模型種類 = 輸入→輸出 × 生成方式、自回歸 vs diffusion、CNN / UNet vs Transformer / DiT、latent / embedding / hidden state、VLM、Ollama / ComfyUI / 自帶 pipeline 對照、應用層 tool call 編排、TRELLIS.2 事實表、產圖地端部署 |
+| [04](notes/04-finetune-distill-lora-rank.md) | fine-tune 的定義與術語階梯、黑箱 / 白箱蒸餾、三條獨立軸、改 context vs 改 W、Modelfile、矩陣的秩、LoRA 是約束不是優越、merge 與推論成本、QLoRA 訓練 VRAM 估算、safetensors vs GGUF、格式 × 引擎 × 環境 |
+| [05](notes/05-harness-and-first-lora-poc.md) | harness / 引擎 / 模型的職責邊界、資料來源只有權重與 prompt、agent loop 與 RAG 時間軸、改認知的三條路（prompt / 權重 / logit_bias）、SFT 與 LoRA 產物、訓練機制與過擬合、第一次 LoRA POC 的資料集與評測設計、災難性遺忘 |
 
 ### 實例研究索引
 
-| 編號 | 案例 | 借它理解的概念 | 日期 |
-|---|---|---|---|
-| [Case 01](cases/01-phison-aidaptiv-ssd-offload-igpu.md) | 群聯 aiDAPTIV+（iGPU + SSD 補記憶體） | iGPU 的 XVE / XMX 與統一記憶體、decode 頻寬綁定 vs prefill 運算綁定、SSD offload 的成立條件（T_搬 ≤ T_算、MoE）、引擎內的配置器 / 預取器住哪一層、計算路 vs 存取路、GPU 無標準 vs NVMe 有標準、綁定對象分析 | 2026-10-30 |
-| [Case 02](cases/02-claude-code-sandbox-seatbelt-design.md) | Claude Code 的 sandbox（harness 借 macOS Seatbelt 關 shell） | harness 層的 least-privilege 設計、邊界畫在工具級（只關 Bash）、settings 四層巢狀 → SBPL → kernel、出題 / 閱卷分開、網路走本機 proxy 做域名白名單、default-deny 的 fail-closed、對 Apple deprecated API 的依賴面、錯誤字串分層診斷、自寫 harness 接地端模型時的同一組問題 | 2026-11-04 |
+| 編號 | 案例 | 借它理解的概念 |
+|---|---|---|
+| [Case 01](cases/01-phison-aidaptiv-ssd-offload-igpu.md) | 群聯 aiDAPTIV+（iGPU + SSD 補記憶體） | iGPU 的 XVE / XMX 與統一記憶體、decode 頻寬綁定 vs prefill 運算綁定、SSD offload 的成立條件（T_搬 ≤ T_算、MoE）、引擎內的配置器 / 預取器住哪一層、計算路 vs 存取路、GPU 無標準 vs NVMe 有標準、綁定對象分析 |
+| [Case 02](cases/02-claude-code-sandbox-seatbelt-design.md) | Claude Code 的 sandbox（harness 借 macOS Seatbelt 關 shell） | harness 層的 least-privilege 設計、邊界畫在工具級（只關 Bash）、settings 四層巢狀 → SBPL → kernel、出題 / 閱卷分開、網路走本機 proxy 做域名白名單、default-deny 的 fail-closed、對 Apple deprecated API 的依賴面、錯誤字串分層診斷、自寫 harness 接地端模型時的同一組問題 |
 
 ## 階段路線圖
 
