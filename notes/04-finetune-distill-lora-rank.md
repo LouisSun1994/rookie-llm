@@ -1,6 +1,5 @@
 # 04 · fine-tune / 蒸餾 / LoRA / 秩 / safetensors 與 GGUF
 
-- 記錄日期：2026-10-16
 - 學習方式：深挖一條線（從「fine-tune 跟蒸餾差在哪」挖到矩陣的秩、LoRA 的 VRAM 與推論成本，再接到權重檔格式：safetensors / GGUF 是什麼、誰吃誰）
 - 目前定位：🥚 概念 → 🐊 fine-tune 的概念前置。尚未動手訓練。
 

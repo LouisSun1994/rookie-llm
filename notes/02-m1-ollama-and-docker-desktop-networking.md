@@ -1,6 +1,5 @@
 # 02 — M1 啟動 Ollama 前的知識點：SLM、MoE、Docker Desktop 網路層
 
-- 記錄日期：2026-10-16
 - 學習方式：準備在 M1 16GB 上首次啟動引擎，從啟動指令往下挖，跨到模型分類（SLM / MoE / FFN）與 Docker Desktop 的網路層
 - 目前定位：🥚 概念 → 🐣 本機驗證的邊界，尚未實際啟動
 

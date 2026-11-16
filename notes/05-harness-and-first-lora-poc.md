@@ -1,6 +1,5 @@
 # 05 — Harness 的邊界與第一次 LoRA POC
 
-- 日期：2026-10-20 ～ 2026-10-21
 - 學習方式：從「Ollama 答不出今日股價」這個現象往下挖，經過 harness / 引擎 / 模型的職責劃分、改模型認知的三條路，最後在 M1 上跑完第一次 LoRA，親眼看到過擬合與退步
 - 目前定位：🥚 概念已走完 → 🐣 本機驗證（Ollama + Open WebUI 已跑起）→ 🐊 fine-tune 第一次動手（POC 跑通，正在修資料集）
 - 相關檔案（repo 根目錄下）：`ft/`（venv，不進 git）、`ft-poc/gen_data.py`、`ft-poc/run_eval.sh`、`ft-poc/before.md`、`ft-poc/after.md`、`ft-poc/adapters*/`

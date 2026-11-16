@@ -1,6 +1,5 @@
 # Case 02 · Claude Code 的 sandbox：一個 harness 怎麼借 macOS Seatbelt 把 shell 關起來
 
-> 日期：2026-11-04
 > 學習方式：從一個現象出發（Claude Code 的 Bash 工具「同一個 `MEMORY.md` 用 `echo >>` 寫不進、用 Edit 寫得進」「`git` 有時 fatal 有時正常」「`osascript` 怎麼設都不通」），反覆用自己的話陳述 → 校正，沿「哪些工具被關 → 規則從哪來 → 誰執行 → 這個設計依賴什麼、會怎麼壞」往下挖
 > 目前定位：🐣 本機驗證 ～ 🐊 fine-tune 第一次動手；這條線是 **harness 支線**（接 notes/05 的 harness / 引擎 / 模型職責邊界），不在主路線上
 > 本篇範圍：只記 Claude Code 這個 harness 的 sandbox **設計**——邊界畫在哪、規則從哪來、為什麼這樣選、什麼情況會壞。Seatbelt 本身的 OS 概念（SBPL、ucred label、fork / exec 繼承、fd capability、XPC 代辦、DAC / MAC / VFS）細節在 rookie-rs note 05，此處只留定位這個 case 所需的最小骨架

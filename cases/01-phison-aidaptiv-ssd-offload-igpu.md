@@ -1,6 +1,5 @@
 # Case 01 · 群聯 aiDAPTIV+：iGPU、SSD 補記憶體、以及它到底掛在哪一層
 
-> 日期：2026-10-30
 > 學習方式：從一則新聞（群聯潘董 CES / Computex 2026 推 aiDAPTIV+ 內顯平台）出發，反覆用自己的話陳述 → 校正，沿「iGPU 是什麼 → 為何 SSD 能補記憶體 → 這套軟體住哪一層 → 計算路 vs 存取路 → 綁定對象」往下挖
 > 目前定位：🐣 本機驗證（M1 已跑 Ollama + Open WebUI，做過第一次 LoRA POC）；這條線是 ML infra 概念支線，不在主路線上
 > 本篇範圍：只記 aiDAPTIV+ 這套的概念與定位。PyTorch = libtorch、Rust 引擎（Candle / Burn / tch-rs）、driver / kernel 三義的細節另記於 Rust 專案；此處只留定位 aiDAPTIV 所需的最小骨架
