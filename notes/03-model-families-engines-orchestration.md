@@ -92,6 +92,20 @@ GPU        矩陣乘法；LLM 頻寬瓶頸、diffusion 算力瓶頸
 p(x₁…xₙ) = p(x₁) · p(x₂|x₁) · p(x₃|x₁,x₂) · … · p(xₙ|x₁…xₙ₋₁)
 ```
 
+**根本差異（只有這一條，後面全是它的後果）**
+
+- 自回歸：一次決定**一個位置**，決定後**永不再改**
+- Diffusion：**所有位置一開始就都在**（全是雜訊），每輪**全部一起改**
+
+```
+自回歸（寫 5 個字，5 輪）        Diffusion（4096 格，20 輪）
+輪1  今                          輪1   ▓▓▓▓▓▓  全雜訊
+輪2  今天                        輪5   ▒▒▒▒▒▒  隱約輪廓
+輪3  今天天                      輪12  ░░░░░░  大致成形
+輪4  今天天氣                    輪20  ██████  定稿
+輪5  今天天氣好 <EOS>
+```
+
 **兩種迴圈並排**
 
 ```python
@@ -116,19 +130,33 @@ for t in range(N):                             # 步數由設定決定（4 / 20 
 image = vae.decode(x)                          # GPU，一次
 ```
 
-| | 自回歸 | Diffusion |
-|---|---|---|
-| 迴圈變數 | 序列（越長越長） | latent（形狀固定，內容整個覆寫） |
-| 每輪 forward 輸入 | 1 個新 token + 舊 KV | 整個 latent，全部重算 |
-| 跨輪狀態 | KV cache（前面 token 不變，hidden state 可留） | 無（latent 整個變，hidden state 全作廢） |
-| 終止 | 模型吐 EOS | 設定的 N |
-| 隨機性 | 每輪 sample | 只在 t=0 初始雜訊 |
-| attention mask | causal | 無（雙向） |
-| 條件進入 | 就是序列前段 | 每輪重新注入（adaLN / joint attention） |
-| 可串流 | 可（前半句已定） | 不可（每處都還會變） |
-| 每輪 GPU 工作量 | 小 → **頻寬瓶頸** | 大 → **算力瓶頸** |
-| 優化手段 | PagedAttention、continuous batching | torch.compile、flash-attn、fp8、蒸餾減步數、多卡切 patch |
-| 多請求合併 | 能：多人的「下一 token」疊成 batch 共讀一次權重 | 單張已塞滿 GPU，疊了只是等更久 → FIFO |
+### 推論鏈 1：形狀與終止
+
+| | 自回歸 | Diffusion | 為什麼 |
+|---|---|---|---|
+| 迴圈變數 | 序列（每輪多一格） | latent（形狀固定，內容整個覆寫） | 根本差異本身 |
+| 終止 | 模型吐 EOS | 設定的 N | 長度未知只能等模型喊停 vs 格數已知，只剩「修幾次」 |
+| 可串流 | 可（前半句已定） | 不可（每處都還會變） | 定了不改才能先吐 |
+| 隨機性 | 每輪 sample | 主要在 t=0 初始雜訊 | 每定一格抽一次 vs 起點抽一次後照著算（ancestral / SDE 類 sampler 每步會再加雜訊） |
+
+### 推論鏈 2：舊的計算能不能留（KV cache 的來源）
+
+| | 自回歸 | Diffusion | 為什麼 |
+|---|---|---|---|
+| 跨輪狀態 | KV cache | 無 | 前面 token 不變 → hidden state 不變 → 可存；latent 整個變 → hidden state 全作廢 |
+| 每輪 forward 輸入 | 1 個新 token + 舊 KV | 整個 latent，全部重算 | 有 cache 只算新的；沒 cache 只能全算 |
+| attention mask | causal | 無（雙向） | 後面的字還不存在，且前面的結果若受後面影響 cache 就不成立；diffusion 所有格都在，互看才能協調 |
+| 條件進入 | 就是序列前段 | 每輪重新注入（adaLN / joint attention） | prompt 進了 KV cache 就一直在；diffusion 每輪是全新 forward，沒有東西記得 prompt |
+
+### 推論鏈 3：GPU 瓶頸（引擎長得不一樣的原因）
+
+| | 自回歸 | Diffusion | 為什麼 |
+|---|---|---|---|
+| 每輪 GPU 工作量 | 小 → **頻寬瓶頸** | 大 → **算力瓶頸** | 每吐 1 token 要讀過整份權重卻只算 1 token，時間花在搬權重；diffusion 每輪 4096 格都要算，算術本身塞滿 GPU |
+| 多請求合併 | 能：多人的「下一 token」疊成 batch 共讀一次權重 | 單張已塞滿 GPU，疊了只是等更久 → FIFO | 瓶頸是讀權重時，多算幾個 token 幾乎免費；瓶頸是算術時，疊了沒有便宜 |
+| 優化手段 | PagedAttention、continuous batching | torch.compile、flash-attn、fp8、蒸餾減步數、多卡切 patch | 把更多人塞進同一次讀取 vs 讓每次算術更快或減少輪數 |
+
+**一句話**：自回歸「定一格、留一格」→ 有 cache、每輪輕、能串流、能合併多人；diffusion「全部一起反覆修」→ 無 cache、每輪重、不能串流、只能排隊。
 
 **比喻**：自回歸 = 寫作文，一字一字往下寫，錯了只能圓回來；diffusion = 畫油畫，先打底再逐層細化，每層可蓋掉上一層。**不是「收斂 vs 發散」**，兩者都收斂到一個樣本；差在生成的順序與範圍。
 
