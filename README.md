@@ -124,7 +124,7 @@
 
 | 路徑 | 內容 |
 |---|---|
-| `notes/` | 學習筆記，依序編號 `NN-主題.md`：沿一條概念線往下挖的主線 |
+| `notes/` | 學習筆記，依序編號 `NN-主題.md`：沿一條概念線往下挖的主線；圖放 `notes/img/`，檔名以筆記編號開頭 |
 | `cases/` | 實例研究，獨立編號 `NN-主題.md`：借一個真實產品或權威案例來理解概念，結構與 notes 相同，只保留定位該 case 所需的最小骨架，細節回指對應的 note |
 | `ft-poc/` | 第一次 LoRA POC：資料產生器、評測腳本、before / after 輸出、adapter 設定與失敗分析（見 [ft-poc/README.md](ft-poc/README.md)） |
 | `ft/` | mlx-lm 的 Python venv，不進 git |
@@ -135,7 +135,7 @@
 |---|---|
 | [01](notes/01-local-llm-deploy-rag-finetune.md) | 三層架構、部署路線圖、Ollama vs vLLM、token 生成流程、量化與模型格式、純推理 / RAG / fine-tune、LoRA 與 QLoRA、黑話與 DSL 策略、Claude 整合 |
 | [02](notes/02-m1-ollama-and-docker-desktop-networking.md) | SLM 的定義與尺寸區間、dense vs MoE 與 FFN、M1 unified memory 估算、Ollama 啟動方式與模型 tag、`host.docker.internal` 在 Mac / Linux 的差異、Docker Desktop 的 VM + userspace proxy 網路層 |
-| [03](notes/03-model-families-engines-orchestration.md) | 模型 vs 引擎（權重沒有說明書、引擎的四塊）、模型種類 = 輸入→輸出 × 生成方式、自回歸 vs diffusion、CNN / UNet vs Transformer / DiT、latent / embedding / hidden state、VLM、Ollama / ComfyUI / 自帶 pipeline 對照、應用層 tool call 編排、TRELLIS.2 事實表、產圖地端部署 |
+| [03](notes/03-model-families-engines-orchestration.md) | 模型 vs 引擎（權重沒有說明書、引擎的四塊）、模型種類 = 輸入→輸出 × 生成方式、產圖的三條路（像素是誰決定的）、自回歸 vs diffusion（沿位置切 vs 沿雜訊程度切、機率表 vs 點估計）、卷積 vs attention、UNet / Transformer / DiT 的命名層級、latent / embedding / hidden state / 權重、為什麼去噪會去出一張圖（抽樣、速度場、flow matching、平均）、DiT 與 VAE decoder 逐個打開、權重 vs 資料與 logits vs 速度、VLM、Ollama / ComfyUI / 自帶 pipeline 對照、應用層 tool call 編排與「文字 + 圖」的三種做法、TRELLIS.2 事實表、產圖地端部署 |
 | [04](notes/04-finetune-distill-lora-rank.md) | fine-tune 的定義與術語階梯、黑箱 / 白箱蒸餾、三條獨立軸、改 context vs 改 W、Modelfile、矩陣的秩、LoRA 是約束不是優越、merge 與推論成本、QLoRA 訓練 VRAM 估算、safetensors vs GGUF、格式 × 引擎 × 環境 |
 | [05](notes/05-harness-and-first-lora-poc.md) | harness / 引擎 / 模型的職責邊界、資料來源只有權重與 prompt、agent loop 與 RAG 時間軸、改認知的三條路（prompt / 權重 / logit_bias）、SFT 與 LoRA 產物、訓練機制與過擬合、第一次 LoRA POC 的資料集與評測設計、災難性遺忘 |
 
